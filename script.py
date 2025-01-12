@@ -57,6 +57,27 @@ def execute_command(client, command):
         print(f"Error executing command: {e}", file=sys.stderr)
         return None
 
+def parse_signal_data(signal_data):
+    """
+    Parse and format the raw signal data into a readable tuple format.
+    """
+    timestamp = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
+    formatted_data = []
+    for entry in signal_data:
+        signal = entry.get('signal')
+        rssi = entry.get('rssi')
+        noise = entry.get('noisefloor')
+        snr = signal - noise if signal is not None and noise is not None else None
+        formatted_data.append({
+            'timestamp': timestamp,
+            'signal': signal,
+            'rssi': rssi,
+            'noise': noise,
+            'snr': snr
+        })
+    return formatted_data
+
+
 # def get_signal_data():
 #     # Initialize SSH client
 #     client = paramiko.SSHClient()
