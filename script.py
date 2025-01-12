@@ -91,6 +91,28 @@ def print_signal_data(parsed_data):
         )
     print("-" * 40)
 
+def main():
+    client = connect_to_host(HOST, USERNAME, SSH_KEY_PATH)
+    if not client:
+        sys.exit("Failed to establish SSH connection. Exiting.")
+
+    try:
+        while True:
+            signal_data = execute_command(client, COMMAND)
+            if signal_data:
+                parsed_data = parse_signal_data(signal_data)
+                print_signal_data(parsed_data)
+            else:
+                print("Failed to retrieve signal data.", file=sys.stderr)
+
+            time.sleep(POLL_INTERVAL)
+    finally:
+        client.close()
+
+
+if __name__ == '__main__':
+    main()
+
 
 # def get_signal_data():
 #     # Initialize SSH client
