@@ -12,10 +12,10 @@ USERNAME = 'ubnt'
 SSH_KEY_PATH = os.path.expanduser('~/.ssh/id_rsa')
 
 # Command to retrieve signal data
-COMMAND = 'wstalist'  # Adjust as needed
+COMMAND = 'wstalist'
 
 # Polling interval in seconds
-POLL_INTERVAL = 1  # Adjust as needed
+POLL_INTERVAL = 1
 
 # Timeout in seconds for each SSH command to return
 COMMAND_TIMEOUT = 0.8
@@ -103,8 +103,9 @@ def print_signal_data(parsed_data):
     Print the parsed signal data in a readable format.
     """
     for entry in parsed_data:
+        t_str = f"{entry['time_since_start']:.2f}s"
         print(
-            f"Timestamp: {entry['timestamp']}, "
+            f"[{t_str}] "
             f"Signal: {entry['signal']} dBm, "
             f"RSSI: {entry['rssi']}, "
             f"Noise: {entry['noise']} dBm, "
@@ -124,14 +125,32 @@ def main():
             # Calculate how many seconds since script started
             offset_seconds = time.time() - start_time
 
-            signal_data = execute_command(client, COMMAND)
-            if signal_data:
-                parsed_data = parse_signal_data(signal_data)
-                print_signal_data(parsed_data)
-            else:
-                print("Failed to retrieve signal data.", file=sys.stderr)
+            # Start a thread to fetch data
+            result_queue = queue.Queue()
+            thread = threading.Thread(target=fetch_signal_data, args=(client, result_queue))
+            thread.start()
 
-            time.sleep(POLL_INTERVAL)
+            # Wait for up to COMMAND_TIMEOUT seconds
+            thread.join(COMMAND_TIMEOUT)
+
+            if thread.is_alive():
+                # The data wasn't returned in time => fill with NULL
+                thread.daemon = True  # Let it run out or be killed
+                signal_data = None
+            else:
+                # If thread finished retrieve the data from the queue
+                signal_data = result_queue.get()
+
+            # Now parse and print
+            parsed_data = parse_signal_data(signal_data, offset_seconds)
+            print_signal_data(parsed_data)
+
+            # Sleep to maintain exact intervals from the start of the loop
+            loop_end = time.time()
+            elapsed = loop_end - (start_time + offset_seconds)
+            time_to_sleep = POLL_INTERVAL - elapsed
+            if time_to_sleep > 0:
+                time.sleep(time_to_sleep)
     finally:
         client.close()
 
