@@ -39,6 +39,24 @@ def connect_to_host(host, username, key_path):
         print(f"Error connecting to host {host}: {e}", file=sys.stderr)
         return None
 
+def execute_command(client, command):
+    """
+    Execute a command on the SSH client and return the output as JSON.
+    """
+    try:
+        stdin, stdout, stderr = client.exec_command(command)
+        output = stdout.read().decode('utf-8')
+        error = stderr.read().decode('utf-8')
+
+        if error:
+            print(f"Command error: {error}", file=sys.stderr)
+            return None
+
+        return json.loads(output)
+    except Exception as e:
+        print(f"Error executing command: {e}", file=sys.stderr)
+        return None
+
 # def get_signal_data():
 #     # Initialize SSH client
 #     client = paramiko.SSHClient()
