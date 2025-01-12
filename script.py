@@ -69,19 +69,28 @@ def fetch_signal_data(client, result_queue):
     data = execute_command(client, COMMAND)
     result_queue.put(data)
 
-def parse_signal_data(signal_data):
+def parse_signal_data(signal_data, offset_seconds):
     """
     Parse and format the raw signal data into a readable tuple format.
     """
-    timestamp = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
     formatted_data = []
+    if not signal_data:
+        # If None or empty, return a single entry with NULL placeholders
+        return [{
+            'time_since_start': offset_seconds,
+            'signal': None,
+            'rssi': None,
+            'noise': None,
+            'snr': None
+        }]
+
     for entry in signal_data:
         signal = entry.get('signal')
         rssi = entry.get('rssi')
         noise = entry.get('noisefloor')
         snr = signal - noise if signal is not None and noise is not None else None
         formatted_data.append({
-            'timestamp': timestamp,
+            'time_since_start': offset_seconds,
             'signal': signal,
             'rssi': rssi,
             'noise': noise,
@@ -108,8 +117,13 @@ def main():
     if not client:
         sys.exit("Failed to establish SSH connection. Exiting.")
 
+    start_time = time.time()
+
     try:
         while True:
+            # Calculate how many seconds since script started
+            offset_seconds = time.time() - start_time
+
             signal_data = execute_command(client, COMMAND)
             if signal_data:
                 parsed_data = parse_signal_data(signal_data)
