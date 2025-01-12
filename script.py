@@ -77,6 +77,20 @@ def parse_signal_data(signal_data):
         })
     return formatted_data
 
+def print_signal_data(parsed_data):
+    """
+    Print the parsed signal data in a readable format.
+    """
+    for entry in parsed_data:
+        print(
+            f"Timestamp: {entry['timestamp']}, "
+            f"Signal: {entry['signal']} dBm, "
+            f"RSSI: {entry['rssi']}, "
+            f"Noise: {entry['noise']} dBm, "
+            f"SNR: {entry['snr']} dB"
+        )
+    print("-" * 40)
+
 
 # def get_signal_data():
 #     # Initialize SSH client
