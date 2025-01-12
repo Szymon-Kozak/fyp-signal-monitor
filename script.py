@@ -17,6 +17,9 @@ COMMAND = 'wstalist'  # Adjust as needed
 # Polling interval in seconds
 POLL_INTERVAL = 1  # Adjust as needed
 
+# Timeout in seconds for each SSH command to return
+COMMAND_TIMEOUT = 0.8
+
 def connect_to_host(host, username, key_path):
     """
     Establish an SSH connection to the specified host and return the client object.
@@ -57,6 +60,14 @@ def execute_command(client, command):
     except Exception as e:
         print(f"Error executing command: {e}", file=sys.stderr)
         return None
+
+def fetch_signal_data(client, result_queue):
+    """
+    Thread target function:
+    Executes the wstalist (or similar) command and puts the result into a queue.
+    """
+    data = execute_command(client, COMMAND)
+    result_queue.put(data)
 
 def parse_signal_data(signal_data):
     """
