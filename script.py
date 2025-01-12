@@ -3,7 +3,8 @@ import time
 import json
 import sys
 import os
-
+import threading
+import queue
 
 # SSH connection details
 HOST = '192.168.1.21'
