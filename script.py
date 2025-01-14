@@ -7,7 +7,7 @@ import threading
 import queue
 
 # SSH connection details
-HOST = '192.168.1.21'
+HOST = '192.168.1.22'
 USERNAME = 'ubnt'
 SSH_KEY_PATH = os.path.expanduser('~/.ssh/id_rsa')
 
@@ -127,7 +127,7 @@ def main():
 
             # Start a thread to fetch data
             result_queue = queue.Queue()
-            thread = threading.Thread(target=fetch_signal_data, args=(client, result_queue))
+            thread = threading.Thread(target=fetch_signal_data, args=(client, result_queue), daemon=True)
             thread.start()
 
             # Wait for up to COMMAND_TIMEOUT seconds
@@ -135,10 +135,9 @@ def main():
 
             if thread.is_alive():
                 # The data wasn't returned in time => fill with NULL
-                thread.daemon = True  # Let it run out or be killed
                 signal_data = None
             else:
-                # If thread finished retrieve the data from the queue
+                # If thread is finished then retrieve the data from the queue
                 signal_data = result_queue.get()
 
             # Now parse and print
