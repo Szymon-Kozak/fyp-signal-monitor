@@ -1,0 +1,6 @@
+# Ignore IntelliJ IDEA project files
+.idea/
+
+# Ignore Python virtual environment
+.venv/
+__pycache__/
