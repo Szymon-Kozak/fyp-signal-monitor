@@ -6,8 +6,8 @@ A lightweight Python tool (part of a Final Year Project) for collecting and proc
 ## Installation
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/<YOUR_USERNAME>/<NEW_REPO_NAME>.git
-   cd <NEW_REPO_NAME>
+   git clone https://github.com/Szymon-Kozak/fyp-signal-monitor.git
+   cd fyp-signal-monitor
    ```
 
 2. **Create and activate a virtual environment**:
