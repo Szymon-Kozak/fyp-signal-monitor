@@ -3,9 +3,6 @@ import sys
 import os
 import json
 
-HOST = '192.168.1.22'
-USERNAME = 'ubnt'
-SSH_KEY_PATH = os.path.expanduser('~/.ssh/id_rsa')
 COMMAND = 'wstalist'
 
 def connect_to_host(host, username, key_path):
@@ -15,7 +12,9 @@ def connect_to_host(host, username, key_path):
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     try:
-        private_key = paramiko.RSAKey.from_private_key_file(key_path)
+        private_key = paramiko.RSAKey.from_private_key_file(
+            os.path.expanduser(key_path)
+        )
         client.connect(
             hostname=host,
             username=username,
@@ -51,11 +50,22 @@ def execute_command(client, command):
         return None
     pass
 
-def fetch_signal_data(client, result_queue):
+def fetch_signal_data(ap_config, result_queue):
     """
     Thread target function:
-    Executes the wstalist (or similar) command and puts the result into a queue.
+    1) Connects to a single AP using SSH.
+    2) Executes wstalist.
+    3) Puts the retrieved data into result_queue along with the AP's host (for reference).
     """
-    data = execute_command(client, COMMAND)
-    result_queue.put(data)
-    pass
+    host = ap_config.get("host")
+    username = ap_config.get("username")
+    key_path = ap_config.get("ssh_key_path")
+
+    client = connect_to_host(host, username, key_path)
+    data = None
+    if client:
+        data = execute_command(client, COMMAND)
+        client.close()
+
+    # Put a tuple: (host, data)
+    result_queue.put((host, data))
