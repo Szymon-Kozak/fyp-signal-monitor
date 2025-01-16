@@ -1,3 +1,4 @@
+import argparse
 import queue
 import threading
 import time
@@ -5,14 +6,33 @@ import sys
 from ssh_connector import connect_to_host, fetch_signal_data
 from data_parser import parse_signal_data
 from signal_printer import print_signal_data
+from mock_data_generator import fetch_signal_data_simulation
 
 POLL_INTERVAL = 1
 COMMAND_TIMEOUT = 0.8
 
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="Wireless Signal Monitor")
+    parser.add_argument(
+        "--simulation",
+        "-s",
+        action="store_true",
+        help="Enable simulation mode (no SSH connection, generate random data for testing purposes)",
+    )
+    return parser.parse_args()
+
 def main():
-    client = connect_to_host( ... ) # host, username, key path
-    if not client:
-        sys.exit("Failed to establish SSH connection. Exiting.")
+    args = parse_arguments()
+    simulation_mode = args.simulation
+
+    if not simulation_mode:
+        # Normal operation: connect via SSH
+        client = connect_to_host(...)
+        if not client:
+            sys.exit("Failed to establish SSH connection. Exiting.")
+    else:
+        # In simulation mode there is no SSH client needed
+        client = None
 
     start_time = time.time()
 
@@ -23,7 +43,22 @@ def main():
 
             # Start a thread to fetch data
             result_queue = queue.Queue()
-            thread = threading.Thread(target=fetch_signal_data, args=(client, result_queue), daemon=True)
+
+            if simulation_mode:
+                # Thread to fetch mock data
+                thread = threading.Thread(
+                    target=fetch_signal_data_simulation,
+                    args=(result_queue,),
+                    daemon=True
+                )
+            else:
+                # Thread to fetch real data
+                thread = threading.Thread(
+                    target=fetch_signal_data,
+                    args=(client, result_queue),
+                    daemon=True
+                )
+
             thread.start()
 
             # Wait for up to COMMAND_TIMEOUT seconds
@@ -47,7 +82,8 @@ def main():
             if time_to_sleep > 0:
                 time.sleep(time_to_sleep)
     finally:
-        client.close()
+        if client and not simulation_mode:
+            client.close()
 
 
 if __name__ == '__main__':
