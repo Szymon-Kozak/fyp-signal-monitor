@@ -6,7 +6,7 @@ import sys
 from ssh_connector import connect_to_host, fetch_signal_data
 from data_parser import parse_signal_data
 from signal_printer import print_signal_data
-from mock_data_generator import generate_mock_signal_data
+from mock_data_generator import fetch_signal_data_simulation
 
 POLL_INTERVAL = 1
 COMMAND_TIMEOUT = 0.8
