@@ -91,3 +91,12 @@ def generate_mock_signal_data():
 
     # Return as a list to mimic real wstalist output for multiple stations
     return [mock_station]
+
+def fetch_signal_data_simulation(result_queue):
+    """
+    Thread target function (simulation mode).
+    Generates random data mimicking 'wstalist' output and puts the result into a queue.
+    """
+    data = generate_mock_signal_data()
+    result_queue.put(data)
+
