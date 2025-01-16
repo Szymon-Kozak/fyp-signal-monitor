@@ -92,11 +92,13 @@ def generate_mock_signal_data():
     # Return as a list to mimic real wstalist output for multiple stations
     return [mock_station]
 
-def fetch_signal_data_simulation(result_queue):
+def fetch_signal_data_simulation(ap_config, result_queue):
     """
     Thread target function (simulation mode).
-    Generates random data mimicking 'wstalist' output and puts the result into a queue.
+    Generates random data mimicking 'wstalist' output and puts the result into the queue.
+    We include 'host' for reference or logging if desired.
     """
-    data = generate_mock_signal_data()
-    result_queue.put(data)
+    host = ap_config.get("host", "SIMULATED_AP")
+    data = generate_mock_signal_data()  # one or more stations
+    result_queue.put((host, data))
 
