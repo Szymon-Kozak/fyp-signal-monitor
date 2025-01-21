@@ -6,12 +6,11 @@ def generate_mock_signal_data():
     Generate randomized data similar to what 'wstalist' returns on a PowerBeam device.
     Returns a Python list of dicts, each with fields closely matching real wstalist output.
     """
-
     mock_station = {
         "mac": "44:D9:E7:DA:71:EB",
         "name": "PowerBeam M5 4",
-        "lastip": "192.168.1.22",
-        "associd": random.randint(1, 5),  # e.g., station index
+        "lastip": "192.168.1.99",  # We'll override this at call if we want
+        "associd": random.randint(1, 5),
         "aprepeater": random.choice([0, 1]),
         "tx": round(random.uniform(100, 200), 3),
         "rx": round(random.uniform(100, 200), 3),
@@ -24,10 +23,10 @@ def generate_mock_signal_data():
         "tx_latency": random.randint(1, 5),
         "uptime": random.randint(100, 50000),
         "ack": random.randint(10, 30),
-        "distance": random.randint(0, 2000),  # e.g., distance to AP in meters
+        "distance": random.randint(0, 2000),
         "txpower": random.randint(-10, 0),
         "noisefloor": -97,
-        "tx_ratedata": [0, 0, 0, 0, 0, 0, 0, 0],
+        "tx_ratedata": [0]*8,
         "airmax": {
             "priority": 0,
             "quality": 0,
@@ -47,10 +46,7 @@ def generate_mock_signal_data():
             "MCS0","MCS1","MCS2","MCS3","MCS4","MCS5","MCS6","MCS7",
             "MCS8","MCS9","MCS10","MCS11","MCS12","MCS13","MCS14","MCS15"
         ],
-        "signals": [
-            0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-            random.randint(-80, -30)  # e.g., final position might be the current signal
-        ],
+        "signals": [0]*15 + [random.randint(-80, -30)],
         "remote_age": random.randint(0, 1000),
         "remote_age_max": random.randint(0, 2000),
         "remote": {
@@ -66,8 +62,8 @@ def generate_mock_signal_data():
             "rx_chainmask": 3,
             "noisefloor": -99,
             "distance": random.randint(0, 2000),
-            "tx_ratedata": [0,0,0,0,0,0,0,0],
-            "time": time.strftime("%Y-%m-%d %H:%M:%S"),  # or leave as a placeholder
+            "tx_ratedata": [0]*8,
+            "time": time.strftime("%Y-%m-%d %H:%M:%S"),
             "cpuload": random.randint(0, 10),
             "totalram": 62136,
             "freeram": random.randint(10000, 60000),
@@ -89,16 +85,29 @@ def generate_mock_signal_data():
         }
     }
 
-    # Return as a list to mimic real wstalist output for multiple stations
+    # Return as a list (wstalist might show multiple stations, but we do one for simplicity)
     return [mock_station]
 
-def fetch_signal_data_simulation(ap_config, result_queue):
+
+def fetch_signal_data_simulation(ap_config, result_queue, all_hosts):
     """
     Thread target function (simulation mode).
     Generates random data mimicking 'wstalist' output and puts the result into the queue.
-    We include 'host' for reference or logging if desired.
+
+    We'll also override the 'lastip' of the mock station so that each AP sees
+    a "station" that claims to be one of the other APs (if so desired).
     """
     host = ap_config.get("host", "SIMULATED_AP")
-    data = generate_mock_signal_data()  # one or more stations
-    result_queue.put((host, data))
+    # Create mock data
+    data = []
+    # For simulation, let's generate station entries for each *other* AP in the set
+    for other_host in all_hosts:
+        if other_host == host:
+            continue
+        station_list = generate_mock_signal_data()
+        # Override the lastip so it 'points' to the other_host
+        station_list[0]["lastip"] = other_host
+        data.extend(station_list)
 
+    # Put a tuple: (host, data)
+    result_queue.put((host, data))

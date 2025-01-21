@@ -29,7 +29,6 @@ def connect_to_host(host, username, key_path):
     except Exception as e:
         print(f"Error connecting to host {host}: {e}", file=sys.stderr)
         return None
-    pass
 
 def execute_command(client, command):
     """
@@ -39,23 +38,20 @@ def execute_command(client, command):
         stdin, stdout, stderr = client.exec_command(command)
         output = stdout.read().decode('utf-8')
         error = stderr.read().decode('utf-8')
-
         if error:
             print(f"Command error: {error}", file=sys.stderr)
             return None
-
         return json.loads(output)
     except Exception as e:
         print(f"Error executing command: {e}", file=sys.stderr)
         return None
-    pass
 
 def fetch_signal_data(ap_config, result_queue):
     """
     Thread target function:
     1) Connects to a single AP using SSH.
     2) Executes wstalist.
-    3) Puts the retrieved data into result_queue along with the AP's host (for reference).
+    3) Puts the retrieved data into result_queue along with the AP's host.
     """
     host = ap_config.get("host")
     username = ap_config.get("username")
