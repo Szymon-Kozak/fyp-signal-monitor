@@ -3,9 +3,6 @@ import sys
 import os
 import json
 
-HOST = '192.168.1.22'
-USERNAME = 'ubnt'
-SSH_KEY_PATH = os.path.expanduser('~/.ssh/id_rsa')
 COMMAND = 'wstalist'
 
 def connect_to_host(host, username, key_path):
@@ -15,7 +12,9 @@ def connect_to_host(host, username, key_path):
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     try:
-        private_key = paramiko.RSAKey.from_private_key_file(key_path)
+        private_key = paramiko.RSAKey.from_private_key_file(
+            os.path.expanduser(key_path)
+        )
         client.connect(
             hostname=host,
             username=username,
@@ -30,7 +29,6 @@ def connect_to_host(host, username, key_path):
     except Exception as e:
         print(f"Error connecting to host {host}: {e}", file=sys.stderr)
         return None
-    pass
 
 def execute_command(client, command):
     """
@@ -38,24 +36,20 @@ def execute_command(client, command):
     """
     try:
         stdin, stdout, stderr = client.exec_command(command)
-        output = stdout.read().decode('utf-8')
-        error = stderr.read().decode('utf-8')
+        output = stdout.read().decode('utf-8').strip()
+        error = stderr.read().decode('utf-8').strip()
 
         if error:
             print(f"Command error: {error}", file=sys.stderr)
             return None
 
-        return json.loads(output)
+        # Ensure the output is valid JSON
+        try:
+            return json.loads(output)
+        except json.JSONDecodeError as e:
+            print(f"JSON decode error: {e}", file=sys.stderr)
+            return None
     except Exception as e:
         print(f"Error executing command: {e}", file=sys.stderr)
         return None
-    pass
 
-def fetch_signal_data(client, result_queue):
-    """
-    Thread target function:
-    Executes the wstalist (or similar) command and puts the result into a queue.
-    """
-    data = execute_command(client, COMMAND)
-    result_queue.put(data)
-    pass

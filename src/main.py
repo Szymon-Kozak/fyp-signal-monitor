@@ -3,88 +3,142 @@ import queue
 import threading
 import time
 import sys
-from ssh_connector import connect_to_host, fetch_signal_data
+
+from ap_config import ap_list
+from ssh_connector import connect_to_host, execute_command
+from mock_data_generator import fetch_signal_data_simulation
 from data_parser import parse_signal_data
 from signal_printer import print_signal_data
-from mock_data_generator import fetch_signal_data_simulation
 
-POLL_INTERVAL = 1
-COMMAND_TIMEOUT = 0.8
+POLL_INTERVAL = 0.5
+COMMAND_TIMEOUT = 0.45
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description="Wireless Signal Monitor")
+    parser = argparse.ArgumentParser(description="Wireless Signal Monitor (Multi-AP)")
     parser.add_argument(
-        "--simulation",
-        "-s",
+        "--simulation", "-s",
         action="store_true",
-        help="Enable simulation mode (no SSH connection, generate random data for testing purposes)",
+        help="Enable simulation mode (no SSH, generate random data)"
+    )
+    parser.add_argument(
+        "--num-aps", "-n",
+        type=int,
+        default=None,
+        help="Number of APs to poll (subset of ap_config). If omitted, uses all."
     )
     return parser.parse_args()
+
+def poll_ssh_connection(host, client, result_queue):
+    """
+    Thread target function for real mode with a persistent SSH session.
+    We just run 'execute_command(client, "wstalist")' and put results into the queue.
+    """
+    data = None
+    if client:
+        data = execute_command(client, "wstalist")
+    result_queue.put((host, data))
 
 def main():
     args = parse_arguments()
     simulation_mode = args.simulation
+    num_aps = args.num_aps
 
+    # Slice the AP list if --num-aps is provided
+    used_ap_list = ap_list
+    if num_aps is not None and num_aps < len(ap_list):
+        used_ap_list = ap_list[:num_aps]
+
+    if not used_ap_list:
+        print("No APs to poll. Exiting.")
+        sys.exit(1)
+
+    # Collect just the hosts for referencing
+    used_hosts = [ap["host"] for ap in used_ap_list]
+    known_hosts_set = set(used_hosts)
+
+    ssh_clients_map = {}
+
+    # If not simulation, connect once to each AP
     if not simulation_mode:
-        # Normal operation: connect via SSH
-        client = connect_to_host(...)
-        if not client:
-            sys.exit("Failed to establish SSH connection. Exiting.")
-    else:
-        # In simulation mode there is no SSH client needed
-        client = None
+        for ap in used_ap_list:
+            host = ap["host"]
+            username = ap["username"]
+            key_path = ap["ssh_key_path"]
+            client = connect_to_host(host, username, key_path)
+            ssh_clients_map[host] = client  # could be None if connect failed
 
     start_time = time.time()
 
     try:
         while True:
-            # Calculate how many seconds since script started
-            offset_seconds = time.time() - start_time
+            loop_start = time.time()
+            offset_seconds = loop_start - start_time
 
-            # Start a thread to fetch data
             result_queue = queue.Queue()
+            threads = []
 
-            if simulation_mode:
-                # Thread to fetch mock data
-                thread = threading.Thread(
-                    target=fetch_signal_data_simulation,
-                    args=(result_queue,),
-                    daemon=True
-                )
-            else:
-                # Thread to fetch real data
-                thread = threading.Thread(
-                    target=fetch_signal_data,
-                    args=(client, result_queue),
-                    daemon=True
-                )
+            for ap in used_ap_list:
+                host = ap["host"]
+                if simulation_mode:
+                    # Simulation: generate mock data with stations
+                    t = threading.Thread(
+                        target=fetch_signal_data_simulation,
+                        args=(ap, result_queue, used_hosts),
+                        daemon=True
+                    )
+                else:
+                    client = ssh_clients_map[host]
+                    t = threading.Thread(
+                        target=poll_ssh_connection,
+                        args=(host, client, result_queue),
+                        daemon=True
+                    )
 
-            thread.start()
+                threads.append(t)
+                t.start()
 
-            # Wait for up to COMMAND_TIMEOUT seconds
-            thread.join(COMMAND_TIMEOUT)
+            # Wait up to COMMAND_TIMEOUT for each thread
+            for t in threads:
+                t.join(COMMAND_TIMEOUT)
 
-            if thread.is_alive():
-                # The data wasn't returned in time => fill with NULL
-                signal_data = None
-            else:
-                # If thread is finished then retrieve the data from the queue
-                signal_data = result_queue.get()
+            # Collect whatever data we got
+            all_host_data = []
+            while not result_queue.empty():
+                host, data = result_queue.get()
+                all_host_data.append((host, data))
 
-            # Now parse and print
-            parsed_data = parse_signal_data(signal_data, offset_seconds)
-            print_signal_data(parsed_data)
+            # Fill in missing hosts with None
+            responded_hosts = {hd[0] for hd in all_host_data}
+            missing_hosts = set(used_hosts) - responded_hosts
+            for mh in missing_hosts:
+                all_host_data.append((mh, None))
 
-            # Sleep to maintain exact intervals from the start of the loop
+            # Parse results
+            parsed_output = parse_signal_data(
+                all_host_data,
+                offset_seconds,
+                known_hosts=known_hosts_set
+            )
+            print_signal_data(parsed_output)
+
+            # Sleep for the remainder of the interval
             loop_end = time.time()
-            elapsed = loop_end - (start_time + offset_seconds)
+            elapsed = loop_end - loop_start
             time_to_sleep = POLL_INTERVAL - elapsed
             if time_to_sleep > 0:
                 time.sleep(time_to_sleep)
-    finally:
-        if client and not simulation_mode:
-            client.close()
 
+    except KeyboardInterrupt:
+        print("\nExiting on user interrupt.")
+
+    finally:
+        # Close all persistent SSH sessions
+        if not simulation_mode:
+            for host, client in ssh_clients_map.items():
+                if client is not None:
+                    client.close()
+
+    sys.exit(0)
 
 if __name__ == '__main__':
     main()
