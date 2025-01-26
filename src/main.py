@@ -10,8 +10,8 @@ from mock_data_generator import fetch_signal_data_simulation
 from data_parser import parse_signal_data
 from signal_printer import print_signal_data
 
-POLL_INTERVAL = 2
-COMMAND_TIMEOUT = 1.8
+POLL_INTERVAL = 0.5
+COMMAND_TIMEOUT = 0.45
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Wireless Signal Monitor (Multi-AP)")
@@ -78,6 +78,7 @@ def main():
             threads = []
 
             for ap in used_ap_list:
+                host = ap["host"]
                 if simulation_mode:
                     # Simulation: generate mock data with stations
                     t = threading.Thread(

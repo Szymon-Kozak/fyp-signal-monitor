@@ -2,25 +2,6 @@ def parse_signal_data(all_host_data, offset_seconds, known_hosts):
     """
     Parse the raw station data from multiple APs and structure it so we know
     the RSS from APx -> APy plus the noise for each AP.
-
-    :param all_host_data: list of (host, station_list) pairs
-    :param offset_seconds: float, time offset since script start
-    :param known_hosts: set of hosts (IPs) that we expect
-    :return: dict of the form:
-      {
-        "time_since_start": <float>,
-        "results": {
-          <host1>: {
-            <host2>: <signal_from_host1's perspective_of_host2>,
-            <host3>: <signal>,
-            "noise": <noise_floor_for_host1>
-          },
-          <host2>: None or {
-             ...
-          },
-          ...
-        }
-      }
     """
     # Initialize a dict for each host
     results_dict = {}
@@ -28,6 +9,7 @@ def parse_signal_data(all_host_data, offset_seconds, known_hosts):
         results_dict[host] = {}  # will become None if we can't parse
 
     for (host, station_list) in all_host_data:
+        # print(f"Parsing data for host: {host}, station_list: {station_list}")  # Debugging statement
         # If we had a timeout or error, station_list is None
         if station_list is None:
             results_dict[host] = None

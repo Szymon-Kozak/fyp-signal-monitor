@@ -36,12 +36,19 @@ def execute_command(client, command):
     """
     try:
         stdin, stdout, stderr = client.exec_command(command)
-        output = stdout.read().decode('utf-8')
-        error = stderr.read().decode('utf-8')
+        output = stdout.read().decode('utf-8').strip()
+        error = stderr.read().decode('utf-8').strip()
+
         if error:
             print(f"Command error: {error}", file=sys.stderr)
             return None
-        return json.loads(output)
+
+        # Ensure the output is valid JSON
+        try:
+            return json.loads(output)
+        except json.JSONDecodeError as e:
+            print(f"JSON decode error: {e}", file=sys.stderr)
+            return None
     except Exception as e:
         print(f"Error executing command: {e}", file=sys.stderr)
         return None
