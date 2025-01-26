@@ -4,6 +4,7 @@ import threading
 import time
 import sys
 import csv
+import os
 
 from ap_config import ap_list
 from ssh_connector import connect_to_host, execute_command
@@ -118,6 +119,8 @@ def main():
     simulation_mode = args.simulation
     num_aps = args.num_aps
 
+    duration = args.duration
+
     # Slice the AP list if --num-aps is provided
     used_ap_list = ap_list
     if num_aps is not None and num_aps < len(ap_list):
@@ -126,6 +129,9 @@ def main():
     if not used_ap_list:
         print("No APs to poll. Exiting.")
         sys.exit(1)
+
+    # We'll interpret num_aps for naming if not provided
+    actual_num_aps = num_aps if num_aps is not None else len(used_ap_list)
 
     # Collect just the hosts for referencing
     used_hosts = [ap["host"] for ap in used_ap_list]
@@ -144,10 +150,37 @@ def main():
 
     start_time = time.time()
 
+    # Generate a CSV filename with dynamic format
+    mode_str = "simulation" if simulation_mode else "real"
+    dur_str = str(duration) if duration else "inf"  # if no duration was given
+    polling_str = str(POLL_INTERVAL)
+    csv_filename = f"data_pull_{mode_str}_{actual_num_aps}_{dur_str}_{polling_str}.csv"
+
+    # Prepare to write CSV (check if file exists to decide on writing header)
+    file_exists = os.path.isfile(csv_filename)
+    csv_file = open(csv_filename, "a", newline="")  # append mode
+    csv_writer = None
+
     try:
+        # We'll determine our column headers once at the start
+        # after we know sorted AP hosts.
+        ap_hosts_sorted = sorted(used_hosts)
+        header = build_csv_header(ap_hosts_sorted)
+
+        csv_writer = csv.writer(csv_file)
+
+        # If the file didn't exist before, write a header row
+        if not file_exists:
+            csv_writer.writerow(header)
+
         while True:
             loop_start = time.time()
             offset_seconds = loop_start - start_time
+
+            # If we have a duration, check if we've exceeded it
+            if duration is not None and offset_seconds >= duration:
+                print("Duration exceeded, stopping script.")
+                break
 
             result_queue = queue.Queue()
             threads = []
@@ -194,6 +227,14 @@ def main():
                 offset_seconds,
                 known_hosts=known_hosts_set
             )
+
+            # build a CSV row from parsed_output
+            row_items = build_csv_row(parsed_output)
+            # append to CSV right before printing
+            csv_writer.writerow(row_items)
+            csv_file.flush()  # ensure it's written to disk
+
+            # Print in console
             print_signal_data(parsed_output)
 
             # Sleep for the remainder of the interval
@@ -207,6 +248,9 @@ def main():
         print("\nExiting on user interrupt.")
 
     finally:
+        # Close CSV file
+        csv_file.close()
+
         # Close all persistent SSH sessions
         if not simulation_mode:
             for host, client in ssh_clients_map.items():
@@ -216,4 +260,4 @@ def main():
     sys.exit(0)
 
 if __name__ == '__main__':
-    main()
+        main()
