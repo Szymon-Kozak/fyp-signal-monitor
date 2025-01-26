@@ -69,7 +69,49 @@ def build_csv_header(ap_hosts):
 
     return header
 
+def build_csv_row(parsed_output):
+    """
+    Given the parsed_output dict:
+      {
+        "time_since_start": <float>,
+        "results": {
+           "192.168.1.21": {
+              "192.168.1.22": -50,
+              "noise": -95
+              ...
+           },
+           ...
+        }
+      }
+    we create a list of values in the same order as build_csv_header().
+    """
+    time_since_start = parsed_output["time_since_start"]
+    results_dict = parsed_output["results"]
 
+    # Sort the APs by IP/host for consistent column order
+    ap_hosts = sorted(results_dict.keys())
+    row_items = [f"{time_since_start:.3f}"]  # start with time as a string
+
+    # For each "this_ap", gather RSS(other_ap->this_ap) for all other_ap, then noise
+    for this_ap in ap_hosts:
+        for other_ap in ap_hosts:
+            if other_ap == this_ap:
+                continue
+            if results_dict[other_ap] is None:
+                # means we had no data from other_ap
+                row_items.append("None")
+            else:
+                link_signal = results_dict[other_ap].get(this_ap)
+                row_items.append(str(link_signal if link_signal is not None else "None"))
+
+        # noise for this_ap
+        if results_dict[this_ap] is None:
+            row_items.append("None")
+        else:
+            noise_val = results_dict[this_ap].get("noise")
+            row_items.append(str(noise_val if noise_val is not None else "None"))
+
+    return row_items
 
 def main():
     args = parse_arguments()
