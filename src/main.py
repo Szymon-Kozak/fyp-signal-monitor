@@ -3,6 +3,7 @@ import queue
 import threading
 import time
 import sys
+import csv
 
 from ap_config import ap_list
 from ssh_connector import connect_to_host, execute_command
@@ -26,6 +27,12 @@ def parse_arguments():
         default=None,
         help="Number of APs to poll (subset of ap_config). If omitted, uses all."
     )
+    parser.add_argument(
+        "--duration", "-d",
+        type=int,
+        default=None,
+        help="Stop the script after N seconds have elapsed."
+    )
     return parser.parse_args()
 
 def poll_ssh_connection(host, client, result_queue):
@@ -37,6 +44,32 @@ def poll_ssh_connection(host, client, result_queue):
     if client:
         data = execute_command(client, "wstalist")
     result_queue.put((host, data))
+
+def build_csv_header(ap_hosts):
+    """
+    Returns a list of column names for the CSV:
+      [time, ap2_ap1_rss, ap3_ap1_rss, ap1_noise, ap1_ap2_rss, ...]
+    matching the order of the final data row.
+    """
+    header = ["time"]  # always have 'time' first
+
+    # We'll label APs as AP1, AP2, ...
+    label_map = {ap_hosts[i]: f"AP{i+1}" for i in range(len(ap_hosts))}
+
+    # For each "this_ap", we collect columns for:
+    #   RSS(other_ap->this_ap) for all other_ap, then noise(this_ap)
+    for this_ap in ap_hosts:
+        for other_ap in ap_hosts:
+            if other_ap == this_ap:
+                continue
+            # column name like "ap2_ap1_rss"
+            header.append(f"{label_map[other_ap].lower()}_{label_map[this_ap].lower()}_rss")
+        # column name like "ap1_noise"
+        header.append(f"{label_map[this_ap].lower()}_noise")
+
+    return header
+
+
 
 def main():
     args = parse_arguments()
