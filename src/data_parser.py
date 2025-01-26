@@ -33,8 +33,6 @@ def parse_signal_data(all_host_data, offset_seconds, known_hosts):
             results_dict[host] = None
             continue
 
-        # We'll store one noise floor per AP. If multiple stations appear,
-        # they usually have the same noisefloor. We'll just use the first we see.
         ap_noise = None
 
         # Check each station

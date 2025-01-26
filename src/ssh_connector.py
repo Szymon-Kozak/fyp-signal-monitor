@@ -46,22 +46,3 @@ def execute_command(client, command):
         print(f"Error executing command: {e}", file=sys.stderr)
         return None
 
-def fetch_signal_data(ap_config, result_queue):
-    """
-    Thread target function:
-    1) Connects to a single AP using SSH.
-    2) Executes wstalist.
-    3) Puts the retrieved data into result_queue along with the AP's host.
-    """
-    host = ap_config.get("host")
-    username = ap_config.get("username")
-    key_path = ap_config.get("ssh_key_path")
-
-    client = connect_to_host(host, username, key_path)
-    data = None
-    if client:
-        data = execute_command(client, COMMAND)
-        client.close()
-
-    # Put a tuple: (host, data)
-    result_queue.put((host, data))

@@ -5,13 +5,13 @@ import time
 import sys
 
 from ap_config import ap_list
-from ssh_connector import fetch_signal_data
+from ssh_connector import connect_to_host, execute_command
 from mock_data_generator import fetch_signal_data_simulation
 from data_parser import parse_signal_data
 from signal_printer import print_signal_data
 
-POLL_INTERVAL = 1
-COMMAND_TIMEOUT = 0.8
+POLL_INTERVAL = 2
+COMMAND_TIMEOUT = 1.8
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Wireless Signal Monitor (Multi-AP)")
@@ -27,6 +27,16 @@ def parse_arguments():
         help="Number of APs to poll (subset of ap_config). If omitted, uses all."
     )
     return parser.parse_args()
+
+def poll_ssh_connection(host, client, result_queue):
+    """
+    Thread target function for real mode with a persistent SSH session.
+    We just run 'execute_command(client, "wstalist")' and put results into the queue.
+    """
+    data = None
+    if client:
+        data = execute_command(client, "wstalist")
+    result_queue.put((host, data))
 
 def main():
     args = parse_arguments()
@@ -46,6 +56,17 @@ def main():
     used_hosts = [ap["host"] for ap in used_ap_list]
     known_hosts_set = set(used_hosts)
 
+    ssh_clients_map = {}
+
+    # If not simulation, connect once to each AP
+    if not simulation_mode:
+        for ap in used_ap_list:
+            host = ap["host"]
+            username = ap["username"]
+            key_path = ap["ssh_key_path"]
+            client = connect_to_host(host, username, key_path)
+            ssh_clients_map[host] = client  # could be None if connect failed
+
     start_time = time.time()
 
     try:
@@ -53,24 +74,25 @@ def main():
             loop_start = time.time()
             offset_seconds = loop_start - start_time
 
-            # We'll poll all APs in parallel
             result_queue = queue.Queue()
             threads = []
 
             for ap in used_ap_list:
                 if simulation_mode:
-                    # Pass the entire used_hosts so each AP can "see" the others
+                    # Simulation: generate mock data with stations
                     t = threading.Thread(
                         target=fetch_signal_data_simulation,
                         args=(ap, result_queue, used_hosts),
                         daemon=True
                     )
                 else:
+                    client = ssh_clients_map[host]
                     t = threading.Thread(
-                        target=fetch_signal_data,
-                        args=(ap, result_queue),
+                        target=poll_ssh_connection,
+                        args=(host, client, result_queue),
                         daemon=True
                     )
+
                 threads.append(t)
                 t.start()
 
@@ -90,14 +112,12 @@ def main():
             for mh in missing_hosts:
                 all_host_data.append((mh, None))
 
-            # Now parse results
+            # Parse results
             parsed_output = parse_signal_data(
                 all_host_data,
                 offset_seconds,
                 known_hosts=known_hosts_set
             )
-
-            # Print in one line
             print_signal_data(parsed_output)
 
             # Sleep for the remainder of the interval
@@ -109,7 +129,15 @@ def main():
 
     except KeyboardInterrupt:
         print("\nExiting on user interrupt.")
-        sys.exit(0)
+
+    finally:
+        # Close all persistent SSH sessions
+        if not simulation_mode:
+            for host, client in ssh_clients_map.items():
+                if client is not None:
+                    client.close()
+
+    sys.exit(0)
 
 if __name__ == '__main__':
     main()
