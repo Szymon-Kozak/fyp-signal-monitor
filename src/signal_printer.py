@@ -18,7 +18,7 @@ def print_signal_data(parsed_output):
     label_map = {ap_hosts[i]: f"AP{i + 1}" for i in range(len(ap_hosts))}
 
     # Begin the output line with time
-    line_items = [f"{time_since_start:.2f}"]
+    line_items = [f"{time_since_start:.1f}"]
 
     # For each "this_ap", we collect: RSS(other_ap->this_ap) for all other_ap, then noise(this_ap)
     # So it looks like:

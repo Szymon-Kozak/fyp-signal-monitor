@@ -14,6 +14,11 @@ ap_list = [
         "username": "ubnt",
         "ssh_key_path": "~/.ssh/id_rsa"
     },
+    {
+        "host": "192.168.1.24",
+        "username": "ubnt",
+        "ssh_key_path": "~/.ssh/id_rsa"
+    },
 
     # Add more APs as needed
 ]

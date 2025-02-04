@@ -25,7 +25,7 @@ def generate_mock_signal_data():
         "ack": random.randint(10, 30),
         "distance": random.randint(0, 2000),
         "txpower": random.randint(-10, 0),
-        "noisefloor": -97,
+        "noisefloor": random.randint(-99, -94),
         "tx_ratedata": [0]*8,
         "airmax": {
             "priority": 0,
